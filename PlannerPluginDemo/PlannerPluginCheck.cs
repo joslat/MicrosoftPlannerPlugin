@@ -162,19 +162,19 @@ public class PlannerPluginCheck
 
         var handlebarsTemplate =
           @"{{!-- Step 1: Read the input JSON and set the Plan Id --}}
-            {{set ""planId"" MicrosoftPlannerPlanId}}
+            {{set ""PlannerPlanId"" MicrosoftPlannerPlanId}}
             {{set ""inputJson"" JsonWithBucketAndTasks}}
-            {{set ""bucketName"" inputJson.bucketname}}
-            {{set ""taskList"" inputJson.tasklist}}
+            {{set ""bucketName"" inputJson.bucketname }}
+            {{set ""taskList"" inputJson.tasklist }}
 
             {{!-- Step 2: Call the CreateBucket helper and get the new bucket --}}
-            {{set ""newBucket"" (MicrosoftPlannerGraphPlugin-CreateBucket planId=bucketName)}}
+            {{set ""newBucket"" (MicrosoftPlannerGraphPlugin-CreateBucket planId=PlannerPlanId name=bucketName)}}
             {{set ""newBucketId"" newBucket.id}}
 
             {{!-- Step 3: Loop through the tasks in the taskList --}}
             {{#each taskList}}
               {{!-- Step 4: Call the CreateTask helper for each task in the list --}}
-              {{set ""newTask"" (MicrosoftPlannerGraphPlugin-CreateTask planId=planId bucketId=newBucketId taskTitle=this.task)}}
+              {{set ""newTask"" (MicrosoftPlannerGraphPlugin-CreateTask planId=PlannerPlanId bucketId=newBucketId taskTitle=this.task)}}
               {{json newTask}}
             {{/each}}";
 
