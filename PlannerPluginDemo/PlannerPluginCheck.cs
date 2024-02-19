@@ -69,9 +69,14 @@ public class PlannerPluginCheck
             inputTask = newGoal;
         }
 
+        Console.WriteLine($"\n --- \n And that's it, now I will be generating the tasks for this glorious goal you have set me to do, thank you user!!!" +
+            $"\n The final goal to generate tasks is: {inputTask}");
+        Console.WriteLine($"\n ==========================================\n Generating Tasks \n ==========================================\n ");
+
         var jsonWithTasks = await kernel.InvokePromptAsync(
             userPromptGenerateTasks, 
                 new KernelArguments() { { "input", inputTask } });
+        Console.WriteLine($"\n ==========================================\n Tasks Generated!! \n ==========================================\n ");
         Console.WriteLine($"The elaborated tasks: {jsonWithTasks}");
 
         var resultJsonTasks = jsonWithTasks.GetValue<string>();
@@ -105,6 +110,8 @@ public class PlannerPluginCheck
             new HandlebarsPromptTemplateFactory()
         );
 
+        Console.WriteLine($"\n ==========================================\n Creating Tasks (and bucket)  in Microsoft Planner \n ==========================================\n ");
+
         // Invoke prompt
         var customHandlebarsPromptResult = 
             await kernel.InvokeAsync(
@@ -114,6 +121,7 @@ public class PlannerPluginCheck
                     { "MicrosoftPlannerPlanId", MicrosoftPlannerPlanId }
                 }
             );
+        Console.WriteLine($"\n ==========================================\n Tasks (and bucket) Created in Planner \n ==========================================\n ");
 
         Console.WriteLine($"\n\n Result:  {customHandlebarsPromptResult}");
 
