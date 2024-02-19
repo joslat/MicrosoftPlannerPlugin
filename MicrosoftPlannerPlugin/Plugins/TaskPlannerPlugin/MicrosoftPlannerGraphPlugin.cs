@@ -143,8 +143,6 @@ public sealed class MicrosoftPlannerGraphPlugin : MicrosoftGraphPluginBase
 
         try
         {
-            //await GraphClient.Planner.Tasks.Request().AddAsync(
-
             createdTask = 
                 await GraphClient.Planner.Tasks
                     .PostAsync(plannerTask);

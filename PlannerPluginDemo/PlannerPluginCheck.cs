@@ -4,6 +4,7 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Planning.Handlebars;
 using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
 using MicrosoftPlannerPlugin;
+using System.Text.Json;
 
 namespace PlannerPluginDemo;
 
@@ -14,7 +15,7 @@ public class PlannerPluginCheck
     public async Task ExecuteAsync()
     {
         Console.WriteLine("Test the planner!!");
-        var modelDeploymentName = "Gpt4v32k"; // "gpt4"; - was 0314 (no function calling)
+        var modelDeploymentName = "Gpt4v32k"; 
         var azureOpenAIEndpoint = Environment.GetEnvironmentVariable("AzureOpenAI_Endpoint", EnvironmentVariableTarget.User);
         var azureOpenAIApiKey = Environment.GetEnvironmentVariable("AzureOpenAI_ApiKey", EnvironmentVariableTarget.User);
 
@@ -32,8 +33,6 @@ public class PlannerPluginCheck
         string msGraphClientId = Environment.GetEnvironmentVariable("msGraphClientId", EnvironmentVariableTarget.User);  // app id
         string msGraphClientSecret = Environment.GetEnvironmentVariable("msGraphClientSecret", EnvironmentVariableTarget.User);  
 
-        // Nope, type does not work here: kernel.Plugins.AddFromType<msGraphPlannerPlugin>();
-        // CUstom plugin for web search test
         string microsoftPlannerGraphPluginName = "MicrosoftPlannerGraphPlugin";
         var msGraphPlannerPlugin = new MicrosoftPlannerGraphPlugin(msGraphTenantId, msGraphClientId, msGraphClientSecret);
         kernel.ImportPluginFromObject(msGraphPlannerPlugin, microsoftPlannerGraphPluginName);
@@ -59,124 +58,43 @@ public class PlannerPluginCheck
             "like to present it to the CTO and get approval - and budget! Also after all is ok-ed I want to announce it in the wiki, Teams " +
             "and some events just to make our people aware.";
 
+        /// Ask the user for input or use the default one
+        Console.WriteLine($"The default goal to generate tasks is: {inputTask}");
+        Console.WriteLine($"\n \n Would you like to have a diferent goal?\n");
+        Console.WriteLine($"If is ok, press enter. Otherwise write the goal for which you'd like to generate a set of tasks in Planner \n");
+
+        var newGoal = Console.ReadLine();
+        if (!string.IsNullOrEmpty(newGoal))
+        {
+            inputTask = newGoal;
+        }
+
         var jsonWithTasks = await kernel.InvokePromptAsync(
             userPromptGenerateTasks, 
                 new KernelArguments() { { "input", inputTask } });
         Console.WriteLine($"The elaborated tasks: {jsonWithTasks}");
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        //////
-        /// this is the function calling part which is trying to get the model to execute the function calling part
-        /// does not work or does weird things - hallucinates and creates code or something else -but not what we want
-        //string userPrompForFunctionCalling = "You are a Microsoft Planner expert,your task is to process a set of tasks provided in JSON format." +
-        //    "This JSON include the bucket name and a task list, Here is the JSON to process:" +
-        //    "---" +
-        //    "{{ $JsonWithBucketAndTasks }}" +
-        //    "---" +
-        //    "I want you to do the following: " +
-        //    "1. First and foremost, create a bucket in Microsoft Planner for a given Microsoft Planner Plan id: {{ $MicrosoftPlannerPlanId }} " +
-        //    "   and with the 'bucketname' in the JSON. Please use the MicrosoftPlannerGraphPlugin for this and the CreateBucketAsync function." +
-        //    "2. Second, retrieve the PlannerBucket returned, as we will need its PlannerBucket id on the next steps." +
-        //    "3. For each task provided in the JSON I would like to create the tasks in Microsoft Planner using the MicrosoftPlannerGraphPlugin " +
-        //    "   and the CreateTaskAsync function. For this you need to provide it the Plan Id and the PlannerBucket id." +
-        //    "" +
-        //    "Please try to process the JSON and invoke the plugin/tools stated directly as you should have access to them." +
-        //    "If something does not work, please remember and state it at the end with all the details.";
-
-        //var functionCallingFunction = kernel.CreateFunctionFromPrompt(
-        //    userPrompForFunctionCalling,
-        //    new OpenAIPromptExecutionSettings()
-        //    {
-        //        ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions,
-        //        MaxTokens = 650,
-        //        Temperature = 0,
-        //        TopP = 1
-        //    });
-
-        //var response =
-        //    await kernel.InvokeAsync(
-        //        functionCallingFunction,
-        //        new KernelArguments()
-        //        {
-        //            { "$JsonWithBucketAndTasks", jsonWithTasks },
-        //            { "$MicrosoftPlannerPlanId", "nRjAlPs9B0OAxFnFDgb5O2UAFw2T" }
-        //        });
-
-        //Console.WriteLine($"Result: {response}");
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// this is the handlebars plan part which is trying to get the model to generate a handlebars plan
-        /// The handlebars CreatePlanAsync does not accept arguments so we put them into the prompt and call the function
-
-        string userPromptCreateInPlanner = "You are a Microsoft Planner expert,your task is to process a set of tasks provided in JSON format." +
-            "This JSON include the bucket name and a task list, Here is an example of the JSON to process:" +
-            "---" +
-            "{\r\n  \"bucketname\": \"2024 Technical Events Announcement Plan\",\r\n  \"tasklist\": [\r\n    {\r\n      \"task\": \"1. Annotate initial ideas for the announcement of the technical events\"\r\n    },\r\n    {\r\n      \"task\": \"2. Brainstorm additional ideas and refine initial thoughts\"\r\n    }\r\n  ]\r\n}" +
-            "---" +
-            "I want you to do the following: " +
-            "1. First and foremost, create a bucket in Microsoft Planner for a given Microsoft Planner Plan id: " + MicrosoftPlannerPlanId +
-            "   and with the 'bucketname' in the JSON. Please use the MicrosoftPlannerGraphPlugin for this and the CreateBucketAsync function." +
-            "2. Second, retrieve the PlannerBucket returned, as we will need its PlannerBucket id on the next steps." +
-            "3. For each task provided in the JSON I would like to create the tasks in Microsoft Planner using the MicrosoftPlannerGraphPlugin " +
-            "   and the CreateTaskAsync function. For this you need to provide it the Plan Id and the PlannerBucket id." +
-            "" +
-            "Please generate me an amazing handlebarsplan including calling the functions mentioned to create the Microsoft Planner Bucket and tasks.";
-
-        var planner = new HandlebarsPlanner(
-            new HandlebarsPlannerOptions() { AllowLoops = true });
-
-
-        var plan = await planner.CreatePlanAsync(kernel, userPromptCreateInPlanner);
-
-        Console.WriteLine($"Plan: {plan}");
-
-        //var result = await plan.InvokeAsync(kernel);
-        //Console.WriteLine($"\nResult:\n{result}\n");
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        //// After 3-6 times it generated a suitable plan to adapt, shown next:
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        //Plan: {{!-- Step 1: Read the input JSON and set the Plan Id --}}
-        //{{set "planId" "nRjAlPs9B0OAxFnFDgb5O2UAFw2T"}}
-        //{{set "inputJson" "YOUR INPUT JSON HERE"}}
-        //{{set "bucketName" inputJson.bucketname}}
-        //{{set "taskList" inputJson.tasklist}}
-
-        //{{!-- Step 2: Call the CreateBucket helper and get the new bucket --}}
-        //{{set "newBucket" (MicrosoftPlannerGraphPlugin-CreateBucket planId=bucketName)}}
-        //{{set "newBucketId" newBucket.id}}
-
-        //{{!-- Step 3: Loop through the tasks in the taskList --}}
-        //{{#each taskList as |task|}}
-        //  {{!-- Step 4: Call the CreateTask helper for each task in the list --}}
-        //  {{set "newTask" (MicrosoftPlannerGraphPlugin-CreateTask planId=planId bucketId=newBucketId taskTitle=task.task)}}
-        //  {{json newTask}}
-        //{{/each}}        
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// Next is the Handlebars prompt template execution, based on the previous plan generate (a valid one)
-        /// 
+        var resultJsonTasks = jsonWithTasks.GetValue<string>();
+        EventPlan eventPlan = DeserializeJsonTasks(resultJsonTasks);
+        eventPlan.Tasklist.Reverse(); // reverse the order of the tasks so we can add them in the correct order in Planner.
 
         var handlebarsTemplate =
-          @"{{!-- Step 1: Read the input JSON and set the Plan Id --}}
-            {{set ""PlannerPlanId"" MicrosoftPlannerPlanId}}
-            {{set ""inputJson"" JsonWithBucketAndTasks}}
-            {{set ""bucketName"" inputJson.bucketname }}
-            {{set ""taskList"" inputJson.tasklist }}
-
-            {{!-- Step 2: Call the CreateBucket helper and get the new bucket --}}
-            {{set ""newBucket"" (MicrosoftPlannerGraphPlugin-CreateBucket planId=PlannerPlanId name=bucketName)}}
+          @"
+            {{set ""newBucket"" (MicrosoftPlannerGraphPlugin-CreateBucket planId=MicrosoftPlannerPlanId name=eventPlan.Bucketname )}}
             {{set ""newBucketId"" newBucket.id}}
 
-            {{!-- Step 3: Loop through the tasks in the taskList --}}
-            {{#each taskList}}
-              {{!-- Step 4: Call the CreateTask helper for each task in the list --}}
-              {{set ""newTask"" (MicrosoftPlannerGraphPlugin-CreateTask planId=PlannerPlanId bucketId=newBucketId taskTitle=this.task)}}
-              {{json newTask}}
-            {{/each}}";
+            {{#each eventPlan.Tasklist}}
+              {{set ""newTask"" (MicrosoftPlannerGraphPlugin-CreateTask planId=MicrosoftPlannerPlanId bucketId=newBucketId taskTitle=this.Task)}}
+            {{/each}}
+            
+            Tell the user that you have created the following Bucket in Microsoft Planner: {{json eventPlan.Bucketname}}
+            As well as the following tasks:
+            {{#each eventPlan.Tasklist}}
+              - {{json this.Task}}
+            {{/each}}
+
+            Let the user know that the tasks have been created in the Microsoft Planner plan and now they need to be done in a funny way.
+           ";
 
         var HandlebarsSPromptFunction = kernel.CreateFunctionFromPrompt(
             new()
@@ -192,14 +110,32 @@ public class PlannerPluginCheck
             await kernel.InvokeAsync(
                 HandlebarsSPromptFunction,
                 new() {
-                    { "JsonWithBucketAndTasks", jsonWithTasks },
+                    { "eventPlan", eventPlan },
                     { "MicrosoftPlannerPlanId", MicrosoftPlannerPlanId }
                 }
             );
 
-        Console.WriteLine($"Result:  {customHandlebarsPromptResult}");
+        Console.WriteLine($"\n\n Result:  {customHandlebarsPromptResult}");
 
         Console.WriteLine();
+    }
 
+    private EventPlan DeserializeJsonTasks(string jsonWithTasks)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+
+        EventPlan eventPlan = JsonSerializer.Deserialize<EventPlan>(jsonWithTasks, options);
+
+        Console.WriteLine($"Bucket Name: {eventPlan.Bucketname}");
+        foreach (var task in eventPlan.Tasklist)
+        {
+            Console.WriteLine(task.Task);
+        }
+
+        return eventPlan;
     }
 }
